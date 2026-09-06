@@ -116,6 +116,8 @@ export function createRtsCamera(canvas) {
   }
 
   function update(dt) {
+    if (!(dt >= 0)) dt = 0;
+    dt = Math.min(dt, 0.1);
     if (fly) {
       fly.t += dt / fly.dur;
       const k = Math.min(1, fly.t);
@@ -175,6 +177,7 @@ export function createRtsCamera(canvas) {
     clampDesired();
     if (d) distTarget = d;
     if (immediate) {
+      fly = null;
       target.x = desired.x;
       target.z = desired.z;
       if (d) dist = d;

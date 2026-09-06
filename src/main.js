@@ -257,7 +257,8 @@ function updateWorldVisuals(dt, matchTime, anim) {
 }
 
 function loop(now) {
-  const dt = Math.min(0.1, (now - last) / 1000);
+  // rAF timestamps can precede performance.now() taken during a slow init; never step backwards.
+  const dt = THREE.MathUtils.clamp((now - last) / 1000, 0, 0.1) || 0;
   last = now;
   frames++;
   if (frames === 2) {
