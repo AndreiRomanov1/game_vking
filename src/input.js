@@ -4,8 +4,11 @@ import {
   unitAtPoint,
   selectInBox,
   applySelection,
+  addToSelection,
+  selectKind,
 } from './units/selection.js';
-import { orderMove, orderAttack } from './units/ai.js';
+import { orderMove, orderAttack, orderStop, orderHold } from './units/ai.js';
+import { useAbility } from './abilities.js';
 
 export function bindInput(game) {
   const { canvas } = game;
@@ -15,10 +18,19 @@ export function bindInput(game) {
   let sx = 0;
   let sy = 0;
   let button = 0;
+  let lastClick = 0;
+  let lastKind = null;
 
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+  window.addEventListener('pointermove', (e) => {
+    const r = canvas.getBoundingClientRect();
+    game.rts.setPointer((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, true);
+  });
+  canvas.addEventListener('pointerleave', () => game.rts.setPointer(0.5, 0.5, false));
+
   canvas.addEventListener('pointerdown', (e) => {
+    if (!game.started || game.paused || game.over) return;
     if (e.button === 1 || e.altKey) return;
     down = true;
     drag = false;
@@ -46,35 +58,141 @@ export function bindInput(game) {
     if (!down) return;
     down = false;
     box.style.display = 'none';
+    if (!game.started || game.paused || game.over) {
+      drag = false;
+      return;
+    }
     const point = pickGround(game.camera, e, canvas, game.terrain.mesh);
-    if (!point) return;
+    if (!point) {
+      drag = false;
+      return;
+    }
+
+    const shift = e.shiftKey;
+    const selected = () => game.units.filter((u) => u.selected && !u.dead);
+
+    if (game.attackMovePending && button === 0) {
+      game.attackMovePending = false;
+      canvas.classList.remove('atk-cursor');
+      const enemy = unitAtPoint(game.units, point, 'defend');
+      const building = pickBuilding(game.camera, e, canvas, game.village.structures);
+      const sel = selected();
+      if (enemy) {
+        orderAttack(sel, game.map, enemy);
+        game.markers.attack(enemy.x, enemy.z);
+      } else if (building) {
+        orderAttack(sel, game.map, building);
+        game.markers.attack(building.x, building.z);
+      } else {
+        orderMove(sel, game.map, point.x, point.z, true);
+        game.markers.move(point.x, point.z);
+      }
+      game.audio.click();
+      drag = false;
+      return;
+    }
 
     if (button === 0) {
       if (drag) {
         const picked = selectInBox(game.units, game.camera, canvas, sx, sy, e.clientX, e.clientY);
-        applySelection(game.units, picked);
+        if (shift) addToSelection(game.units, picked);
+        else applySelection(game.units, picked);
       } else {
         const u = unitAtPoint(game.units, point, 'viking');
-        applySelection(game.units, u ? [u] : []);
+        const now = performance.now();
+        if (u && lastKind === u.kind && now - lastClick < 320) {
+          selectKind(game.units, u.kind);
+        } else if (shift) {
+          applySelection(game.units, u ? [u] : [], true);
+        } else {
+          applySelection(game.units, u ? [u] : []);
+        }
+        lastClick = now;
+        lastKind = u?.kind || null;
       }
     } else if (button === 2) {
-      const selected = game.units.filter((u) => u.selected && !u.dead);
-      if (!selected.length) return;
+      const sel = selected();
+      if (!sel.length) {
+        drag = false;
+        return;
+      }
       const enemy = unitAtPoint(game.units, point, 'defend');
       const building = pickBuilding(game.camera, e, canvas, game.village.structures);
-      if (enemy) orderAttack(selected, game.map, enemy);
-      else if (building) orderAttack(selected, game.map, building);
-      else orderMove(selected, game.map, point.x, point.z, true);
+      if (enemy) {
+        orderAttack(sel, game.map, enemy);
+        game.markers.attack(enemy.x, enemy.z);
+      } else if (building) {
+        orderAttack(sel, game.map, building);
+        game.markers.attack(building.x, building.z);
+      } else {
+        orderMove(sel, game.map, point.x, point.z, !shift);
+        game.markers.move(point.x, point.z);
+      }
+      game.audio.click();
     }
     drag = false;
   });
 
   window.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter' && !game.started) {
+      game.startMatch?.();
+      return;
+    }
+    if (e.code === 'Escape') {
+      game.togglePause?.();
+      return;
+    }
+    if (e.code === 'KeyM') {
+      const muted = game.audio.toggleMute();
+      game.hud.setMuted?.(muted);
+      return;
+    }
+    if (!game.started || game.paused || game.over) return;
+
     if (e.code === 'KeyF') {
       applySelection(
         game.units,
         game.units.filter((u) => !u.dead && u.side === 'viking'),
       );
+    }
+    if (e.code === 'KeyX') {
+      orderStop(game.units.filter((u) => u.selected && !u.dead));
+    }
+    if (e.code === 'KeyH') {
+      orderHold(game.units.filter((u) => u.selected && !u.dead));
+    }
+    if (e.code === 'KeyZ') {
+      game.attackMovePending = !game.attackMovePending;
+      canvas.classList.toggle('atk-cursor', game.attackMovePending);
+    }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      const sel = game.units.filter((u) => u.selected && !u.dead);
+      if (sel.length) {
+        const x = sel.reduce((s, u) => s + u.x, 0) / sel.length;
+        const z = sel.reduce((s, u) => s + u.z, 0) / sel.length;
+        game.rts.focus(x, z, undefined, false);
+      }
+    }
+    if (e.code === 'Home') {
+      game.rts.focus(0.3, 15.2, 31, false);
+    }
+    if (e.code === 'KeyR') useAbility(game.units, 'rage', game.hud, game.audio, game.floats);
+    if (e.code === 'KeyT') useAbility(game.units, 'wall', game.hud, game.audio, game.floats);
+    if (e.code === 'KeyG') useAbility(game.units, 'volley', game.hud, game.audio, game.floats);
+
+    const num = { Digit1: 1, Digit2: 2, Digit3: 3 }[e.code];
+    if (num) {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        game.groups[num] = game.units.filter((u) => u.selected && !u.dead);
+      } else {
+        const group = game.groups[num] || [];
+        applySelection(
+          game.units,
+          group.filter((u) => !u.dead),
+        );
+      }
     }
   });
 }

@@ -147,11 +147,69 @@ export const UNIT_TYPES = {
   },
 };
 
+export const LOOT = {
+  hut: 40,
+  gate: 25,
+  tower: 30,
+  longhouse: 150,
+  chief: 60,
+  purse: 12,
+};
+
+export const ABILITIES = {
+  rage: {
+    id: 'rage',
+    kinds: ['berserk'],
+    key: 'KeyR',
+    hint: 'R',
+    name: 'Ярость',
+    desc: 'Скорость и удар берсерков',
+    duration: 7,
+    cooldown: 18,
+  },
+  wall: {
+    id: 'wall',
+    kinds: ['shield'],
+    key: 'KeyT',
+    hint: 'T',
+    name: 'Стена щитов',
+    desc: 'Держат град стрел',
+    duration: 8,
+    cooldown: 16,
+  },
+  volley: {
+    id: 'volley',
+    kinds: ['archer'],
+    key: 'KeyG',
+    hint: 'G',
+    name: 'Залп',
+    desc: 'Три быстрых тяжёлых выстрела',
+    shots: 3,
+    cooldown: 14,
+  },
+};
+
+export const VILLAGERS = [
+  { x: -6.2, z: -1.2 },
+  { x: 6.8, z: 0.2 },
+  { x: -3.4, z: -4.8 },
+  { x: 4.2, z: -3.6 },
+  { x: -8.8, z: -6.2 },
+  { x: 2.2, z: -1.8 },
+  { x: -1.1, z: 1.4 },
+];
+
 export const FUN_LINES = {
   hitViking: ['В Вальгаллу!', 'За ярла!', 'Ха-ха!', 'Ещё!'],
   hitDefend: ['Ой!', 'Моя курица!', 'Караул!', 'Не по голове!'],
-  land: ['К берегу!', 'Драккары сели!', 'На песок!'],
+  land: ['Отряд на берегу! Веди на ворота — ПКМ'],
   fire: ['Крыша пылает!', 'Жарче бани!', 'Деревня пышет!'],
   dusk: ['Солнце падает в море'],
-  night: ['Ночь и зарево'],
+  night: ['Ночь с нами — бей смелее!'],
+  loot: ['Мошна!', 'В мешок!', 'Блестит!'],
+  gate: ['Ворота хрясь! В деревню!'],
+  reserve: ['Из холла выбежала стража!'],
+  rage: ['Ярость Одина!'],
+  wall: ['Щиты вперёд!'],
+  volley: ['Тетива поёт!'],
 };
