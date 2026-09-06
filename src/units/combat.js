@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { FUN_LINES, LOOT } from '../config.js';
 import { makeArrowTex } from './sprites.js';
 import { killUnit } from './unit.js';
