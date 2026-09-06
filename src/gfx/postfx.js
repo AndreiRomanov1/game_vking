@@ -13,7 +13,7 @@ const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
     uTime: { value: 0 },
-    uVignette: { value: 0.32 },
+    uVignette: { value: 0.22 },
     uGrain: { value: 0.014 },
     uSaturation: { value: 1.12 },
     uContrast: { value: 1.06 },
@@ -181,7 +181,7 @@ export function createPostFx(renderer, scene, camera, opts = {}) {
 
   function setMood(look) {
     grade.uniforms.uWarmth.value = look ? look.warmth : 0;
-    grade.uniforms.uVignette.value = 0.3 + (look ? look.night * 0.14 : 0);
+    grade.uniforms.uVignette.value = 0.22 + (look ? look.night * 0.14 : 0);
   }
 
   const q = new URLSearchParams(location.search).get('q');
