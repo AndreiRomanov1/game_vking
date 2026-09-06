@@ -171,11 +171,11 @@ export function bindInput(game) {
       if (sel.length) {
         const x = sel.reduce((s, u) => s + u.x, 0) / sel.length;
         const z = sel.reduce((s, u) => s + u.z, 0) / sel.length;
-        game.rts.focus(x, z);
+        game.rts.focus(x, z, undefined, false);
       }
     }
     if (e.code === 'Home') {
-      game.rts.focus(0.3, 15.2, 31);
+      game.rts.focus(0.3, 15.2, 31, false);
     }
     if (e.code === 'KeyR') useAbility(game.units, 'rage', game.hud, game.audio, game.floats);
     if (e.code === 'KeyT') useAbility(game.units, 'wall', game.hud, game.audio, game.floats);

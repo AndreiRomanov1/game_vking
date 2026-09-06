@@ -11,7 +11,7 @@ export function createHud(root, canvas, camera, game) {
         <div class="hud-sub">сожги холл · награбь золото · не дай себя перебить</div>
       </div>
       <div class="hud-caption" id="caption"></div>
-      <div class="raid-panel">
+      <div class="raid-panel glass">
         <div class="raid-gold" id="gold">✦ 0</div>
         <div class="raid-counts" id="counts">своих 0 · врагов 0</div>
       </div>
@@ -20,13 +20,14 @@ export function createHud(root, canvas, camera, game) {
         <div class="day-bar"><div class="day-needle" id="day-needle"></div></div>
       </div>
       <button class="mute-btn" id="mute" type="button">звук</button>
-      <div class="hud-help">
-        ЛКМ — выделить · рамка — отряд · Shift — добавить<br/>
-        ПКМ — идти / бить · Shift+ПКМ — только идти<br/>
-        X — стой · H — держись · Z — атака-ход · F — все<br/>
-        R ярость · T щиты · G залп · WASD камера · пробел — к отряду
+      <button class="mute-btn q-btn" id="quality" type="button">графика</button>
+      <div class="hud-help glass">
+        <b>ЛКМ</b> — выделить · рамка — отряд · <b>Shift</b> — добавить<br/>
+        <b>ПКМ</b> — идти / бить · <b>Shift+ПКМ</b> — только идти<br/>
+        <b>X</b> — стой · <b>H</b> — держись · <b>Z</b> — атака-ход · <b>F</b> — все<br/>
+        <b>R</b> ярость · <b>T</b> щиты · <b>G</b> залп · <b>WASD</b> камера · <b>пробел</b> — к отряду
       </div>
-      <div class="hud-sel" id="sel">
+      <div class="hud-sel glass" id="sel">
         <div id="sel-text">Выдели викингов и веди на ворота</div>
         <div class="abil-row" id="abils"></div>
       </div>
@@ -44,6 +45,7 @@ export function createHud(root, canvas, camera, game) {
       <div class="panel">
         <h1>ПАУЗА</h1>
         <button class="btn" id="resume" type="button">Продолжить</button>
+        <button class="btn ghost" id="quality-pause" type="button">Графика: высокая</button>
         <button class="btn ghost" id="restart-pause" type="button">Заново</button>
       </div>
     </div>
@@ -67,6 +69,8 @@ export function createHud(root, canvas, camera, game) {
   const pause = root.querySelector('#pause');
   const end = root.querySelector('#end');
   const muteBtn = root.querySelector('#mute');
+  const qualityBtn = root.querySelector('#quality');
+  const qualityPauseBtn = root.querySelector('#quality-pause');
   const hpLayer = document.createElement('div');
   hpLayer.className = 'hp-layer';
   root.appendChild(hpLayer);
@@ -90,6 +94,15 @@ export function createHud(root, canvas, camera, game) {
   function setMuted(muted) {
     muteBtn.textContent = muted ? 'тихо' : 'звук';
     muteBtn.classList.toggle('off', muted);
+  }
+
+  for (const btn of [qualityBtn, qualityPauseBtn]) {
+    btn.addEventListener('click', () => game.postfx?.cycle());
+  }
+
+  function setQuality(label) {
+    qualityBtn.textContent = `графика: ${label}`;
+    qualityPauseBtn.textContent = `Графика: ${label}`;
   }
 
   function say(text) {
@@ -213,6 +226,6 @@ export function createHud(root, canvas, camera, game) {
     end.classList.add('show');
   }
 
-  const api = { say, update, end: endMatch, hideMenu, setPaused, setMuted };
+  const api = { say, update, end: endMatch, hideMenu, setPaused, setMuted, setQuality };
   return api;
 }

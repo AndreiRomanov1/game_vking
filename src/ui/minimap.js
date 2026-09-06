@@ -29,7 +29,7 @@ export function createMinimap(root, game) {
   wrap.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     const p = pxToWorld(e.clientX, e.clientY);
-    game.rts.focus(p.x, p.z);
+    game.rts.focus(p.x, p.z, undefined, false);
   });
 
   function draw(g) {

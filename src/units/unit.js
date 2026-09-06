@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { UNIT_TYPES } from '../config.js';
-import { getSpriteMaps, makeShadowTex } from './sprites.js';
+import { getSpriteMaps, makeShadowTex, makeRingTex } from './sprites.js';
 import { terrainHeight } from '../world/map.js';
 
 const plane = new THREE.PlaneGeometry(1, 1.28);
 const shadowGeo = new THREE.PlaneGeometry(1, 1);
-const ringGeo = new THREE.RingGeometry(0.42, 0.52, 20);
+const ringGeo = new THREE.PlaneGeometry(1.25, 1.25);
 
 export function createUnit(kind, x, z, extras = {}) {
   const def = UNIT_TYPES[kind];
@@ -36,13 +36,17 @@ export function createUnit(kind, x, z, extras = {}) {
   const ring = new THREE.Mesh(
     ringGeo,
     new THREE.MeshBasicMaterial({
-      color: def.side === 'viking' ? 0x7cff4a : 0xff5a3a,
+      map: makeRingTex(),
+      color: def.side === 'viking' ? 0x9cff5a : 0xff6a4a,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
     }),
   );
   ring.rotation.x = -Math.PI / 2;
+  ring.scale.setScalar(def.scale * 0.85);
   ring.visible = false;
 
   const hp = def.hp;

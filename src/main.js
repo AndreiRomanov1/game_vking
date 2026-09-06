@@ -7,6 +7,7 @@ import { createTerrain, updateTerrain } from './world/terrain.js';
 import { createWater, updateWater } from './world/water.js';
 import { createVillage } from './world/village.js';
 import { createProps } from './world/props.js';
+import { createGrass } from './world/grass.js';
 import { createVillagers, updateVillagers } from './world/villagers.js';
 import { createShips, updateShips, deckWorld } from './world/ships.js';
 import { createUnit, place, addUnitToScene, updateBillboards } from './units/unit.js';
@@ -20,23 +21,26 @@ import { createHud } from './ui/hud.js';
 import { createMarkers } from './ui/markers.js';
 import { createAudio } from './audio.js';
 import { bindInput } from './input.js';
+import { createPostFx, QUALITY_LABELS } from './gfx/postfx.js';
 
 const canvas = document.getElementById('game');
 const hudRoot = document.getElementById('hud');
+const fadeEl = document.getElementById('fade');
 
 const renderer = new THREE.WebGLRenderer({
   canvas,
   antialias: true,
   powerPreference: 'high-performance',
   alpha: false,
+  stencil: false,
 });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
 const rts = createRtsCamera(canvas);
 const camera = rts.camera;
-rts.focus(0.3, 15.2, 31);
+rts.focus(0, 5, 30);
+rts.setPitchOffset(-22, true);
 
 const map = createMap();
 const day = createDayCycle(scene, renderer);
@@ -44,6 +48,16 @@ const terrain = createTerrain(scene);
 const water = createWater(scene);
 const village = createVillage(scene, map, day);
 const props = createProps(scene);
+const grass = createGrass(scene, { count: 15000, seed: 1 });
+const flowers = createGrass(scene, {
+  count: 900,
+  seed: 5,
+  flowers: true,
+  base: '#3a7a28',
+  tip: '#ffd94a',
+  height: 0.34,
+  width: 0.11,
+});
 const villagers = createVillagers(scene);
 const ships = createShips(scene);
 const fx = createFx(scene);
@@ -51,6 +65,13 @@ const combat = createCombat();
 const floats = createFloatingText(hudRoot, camera, canvas);
 const markers = createMarkers(scene);
 const audio = createAudio();
+
+const fireLights = [];
+for (let i = 0; i < 4; i++) {
+  const l = new THREE.PointLight(0xff7a2a, 0, 13, 1.9);
+  scene.add(l);
+  fireLights.push(l);
+}
 
 const units = [];
 
@@ -96,12 +117,19 @@ const game = {
   floats,
   markers,
   hud: null,
+  postfx: null,
   startMatch: null,
   togglePause: null,
 };
 
+const postfx = createPostFx(renderer, scene, camera, {
+  onChange: (level) => game.hud?.setQuality(QUALITY_LABELS[level]),
+});
+game.postfx = postfx;
+
 const hud = createHud(hudRoot, canvas, camera, game);
 game.hud = hud;
+hud.setQuality(QUALITY_LABELS[postfx.level]);
 
 combat.onHit = () => audio.hit();
 combat.onKill = (unit, loot = 0) => {
@@ -114,6 +142,7 @@ function addGold(amount, x, y, z) {
   game.gold += amount;
   game.stats.gold += amount;
   floats.spawn(x, y, z, `+${amount}`, '#ffe08a');
+  fx.burst(x, y - 0.4, z, 'gold', Math.min(18, 5 + (amount / 10) | 0));
   audio.gold();
 }
 
@@ -126,6 +155,7 @@ function onEvent(type, st) {
     addGold(loot, st.x, 2.6, st.z);
     game.stats.buildings += 1;
     audio.fire();
+    rts.shake(st.kind === 'longhouse' ? 0.55 : st.kind === 'gate' ? 0.45 : 0.22);
     if (st.kind === 'gate') {
       hud.say(FUN_LINES.gate[0]);
       spawnReserves();
@@ -146,6 +176,7 @@ function spawnReserves() {
     const u = createUnit('militia', s.x, s.z);
     addUnitToScene(scene, u);
     units.push(u);
+    fx.burst(s.x, u.y + 0.3, s.z, 'dust', 8);
   }
   hud.say(FUN_LINES.reserve[0]);
 }
@@ -157,6 +188,7 @@ game.startMatch = () => {
   audio.start();
   hud.say('Драккары на горизонте!');
   rts.setEdgeScroll(true);
+  rts.flyTo(rts.target.x, rts.target.z, rts.dist, rts.yaw, 0.3, 15.2, 31, 0.22, 2.8);
 };
 
 game.togglePause = () => {
@@ -175,28 +207,79 @@ let saidNight = false;
 let saidFire = false;
 
 function resize() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  renderer.setSize(w, h, false);
+  postfx.resize();
   rts.resize();
+  const size = new THREE.Vector2();
+  renderer.getDrawingBufferSize(size);
+  fx.setViewport(size.y, camera.fov);
 }
 window.addEventListener('resize', resize);
 resize();
 
 let last = performance.now();
+let menuClock = 0;
+let frames = 0;
+
+function updateFireLights(time) {
+  const burning = village.structures.filter((s) => s.onFire);
+  burning.sort((a, b) => {
+    const da = (a.x - rts.target.x) ** 2 + (a.z - rts.target.z) ** 2;
+    const db = (b.x - rts.target.x) ** 2 + (b.z - rts.target.z) ** 2;
+    return da - db;
+  });
+  for (let i = 0; i < fireLights.length; i++) {
+    const l = fireLights[i];
+    const st = burning[i];
+    if (!st) {
+      l.intensity = 0;
+      continue;
+    }
+    l.position.set(st.x, st.group.position.y + 2.2, st.z);
+    l.intensity = (5.5 + Math.sin(time * 17 + i * 2.1) * 1.3 + Math.sin(time * 31 + i) * 0.7) * (st.dead ? 0.7 : 1);
+  }
+}
+
+function updateWorldVisuals(dt, matchTime, anim) {
+  const burning = village.structures.filter((s) => s.onFire).length;
+  game.look = day.update(matchTime, burning * 0.22, anim);
+  updateWater(water, anim, game.look);
+  updateTerrain(terrain, anim);
+  grass.update(anim, game.look);
+  flowers.update(anim, game.look);
+  village.update(anim, game.look);
+  fx.setLook(game.look);
+  postfx.setMood(game.look);
+  for (const src of village.smokeSources) {
+    if (src.st.dead) continue;
+    fx.emitSmoke(src.x, src.y, src.z, dt, src.rate * (0.6 + game.look.night * 0.8));
+  }
+  updateFireLights(anim);
+}
 
 function loop(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  frames++;
+  if (frames === 2) {
+    fadeEl.classList.add('out');
+    setTimeout(() => fadeEl.remove(), 2000);
+  }
   const time = game.started && !game.paused ? (game.matchTime += dt) : game.matchTime;
 
-  const burning = village.structures.filter((s) => s.onFire).length;
-  game.look = day.update(time, burning * 0.22);
-  updateWater(water, time, game.look);
-  updateTerrain(terrain, time);
-
   if (!game.started || game.paused) {
-    updateShips(ships, 0, time, fx);
+    if (!game.started) {
+      menuClock += dt;
+      rts.focus(
+        Math.sin(menuClock * 0.09) * 5,
+        5 + Math.cos(menuClock * 0.07) * 2.5,
+        30 + Math.sin(menuClock * 0.05) * 2.5,
+        false,
+      );
+      rts.setYaw(Math.sin(menuClock * 0.06) * 0.45);
+    }
+    const ambient = game.started ? time : menuClock;
+    updateWorldVisuals(dt, time, ambient);
+    updateShips(ships, 0, time, fx, ambient);
     for (const u of units) {
       if (u.state === 'aboard' && u.ship) {
         const p = deckWorld(u.ship, u.local.x, u.local.z);
@@ -208,15 +291,16 @@ function loop(now) {
     }
     fx.update(dt);
     floats.update(dt);
-    props.update(dt, time, camera);
+    props.update(dt, ambient, camera);
     rts.update(game.paused ? 0 : dt);
     updateBillboards(units, camera);
     hud.update(dt, game);
-    renderer.render(scene, camera);
+    postfx.render(dt);
     requestAnimationFrame(loop);
     return;
   }
 
+  updateWorldVisuals(dt, time, time);
   updateShips(ships, dt, time, fx);
   tickBuffs(units, dt);
 
@@ -254,7 +338,8 @@ function loop(now) {
           map,
         );
       });
-      fx.burst(ship.mesh.position.x, 0.25, ship.mesh.position.z - 2.1, 'splash', 16);
+      fx.burst(ship.mesh.position.x, 0.25, ship.mesh.position.z - 2.1, 'splash', 22);
+      rts.shake(0.12);
     }
   }
 
@@ -281,6 +366,7 @@ function loop(now) {
       u.state = 'idle';
       u.y = h1;
       u.home = { x: u.x, z: u.z };
+      fx.burst(u.x, u.y + 0.1, u.z, 'dust', 5);
     }
     place(u);
   }
@@ -314,6 +400,9 @@ function loop(now) {
     }
     u.bob += dt * (u.state === 'move' ? 11 : 4.2);
     u.mesh.position.y += Math.sin(u.bob) * 0.045 * u.def.scale;
+    if (u.state === 'move' && u.side === 'viking' && Math.random() < dt * 2.5) {
+      fx.burst(u.x, u.y + 0.05, u.z, 'dust', 1);
+    }
     if (u.state === 'attack') {
       u.mat.map = u.maps.attack;
       u.mesh.scale.y = u.def.scale * (1.06 + Math.sin(time * 18) * 0.05);
@@ -329,6 +418,7 @@ function loop(now) {
       u.mat.emissive.setHex(0xff4020);
       u.mat.emissiveIntensity = 1.15;
       u.mesh.scale.y *= 1.06;
+      if (Math.random() < dt * 10) fx.burst(u.x, u.y + 0.9, u.z, 'ember', 1);
     } else if (u.buffs.wall > 0) {
       u.mat.emissive.setHex(0x4a88ff);
       u.mat.emissiveIntensity = 0.95;
@@ -340,13 +430,25 @@ function loop(now) {
       u.mat.emissive.setHex(0x33220a);
       u.mat.emissiveIntensity = 0.35;
     }
+    if (u.selected) {
+      const pulse = 0.85 + Math.sin(time * 4 + u.bob) * 0.06;
+      u.ring.scale.setScalar(u.def.scale * pulse);
+      u.ring.material.opacity = 0.75 + Math.sin(time * 4 + u.bob) * 0.2;
+    }
     if (u.side === 'viking' && u.state !== 'aboard' && time > 8) {
       props.scareChickens(u.x, u.z);
     }
   }
 
   for (const st of village.structures) {
-    if (st.onFire) fx.emitFire(st.x, st.group.position.y + 1.5, st.z, dt);
+    if (st.onFire) {
+      const k = st.dead ? 0.8 : 1;
+      fx.emitFire(st.x, st.group.position.y + 1.5, st.z, dt, k);
+      if (st.kind === 'longhouse') {
+        fx.emitFire(st.x - 2.4, st.group.position.y + 2.2, st.z, dt, 0.7 * k);
+        fx.emitFire(st.x + 2.4, st.group.position.y + 2.2, st.z, dt, 0.7 * k);
+      }
+    }
   }
 
   if (game.look.phase === 'Закат' && !saidDusk) {
@@ -388,7 +490,7 @@ function loop(now) {
     }
   }
 
-  renderer.render(scene, camera);
+  postfx.render(dt);
   requestAnimationFrame(loop);
 }
 

@@ -12,6 +12,24 @@ function canvas(w, h) {
   return { c, ctx };
 }
 
+function shade(hex, amt) {
+  if (typeof hex !== 'string' || hex[0] !== '#' || hex.length !== 7) return hex;
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n >> 16) & 255;
+  let g = (n >> 8) & 255;
+  let b = n & 255;
+  if (amt >= 0) {
+    r += (255 - r) * amt;
+    g += (255 - g) * amt;
+    b += (255 - b) * amt;
+  } else {
+    r *= 1 + amt;
+    g *= 1 + amt;
+    b *= 1 + amt;
+  }
+  return `rgb(${r | 0},${g | 0},${b | 0})`;
+}
+
 function strokeFill(ctx, fill, lw = 5) {
   ctx.fillStyle = fill;
   ctx.lineWidth = lw;
@@ -23,15 +41,37 @@ function strokeFill(ctx, fill, lw = 5) {
 function ell(ctx, x, y, rx, ry, fill, lw) {
   ctx.beginPath();
   ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-  strokeFill(ctx, fill, lw);
+  let paint = fill;
+  if (typeof fill === 'string' && fill[0] === '#') {
+    const r = Math.max(rx, ry);
+    const g = ctx.createRadialGradient(x - rx * 0.32, y - ry * 0.38, r * 0.08, x, y, r * 1.12);
+    g.addColorStop(0, shade(fill, 0.32));
+    g.addColorStop(0.55, fill);
+    g.addColorStop(1, shade(fill, -0.35));
+    paint = g;
+  }
+  strokeFill(ctx, paint, lw);
 }
 
 function poly(ctx, pts, fill, lw) {
   ctx.beginPath();
   ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  let minY = pts[0][1];
+  let maxY = pts[0][1];
+  for (let i = 1; i < pts.length; i++) {
+    ctx.lineTo(pts[i][0], pts[i][1]);
+    minY = Math.min(minY, pts[i][1]);
+    maxY = Math.max(maxY, pts[i][1]);
+  }
   ctx.closePath();
-  strokeFill(ctx, fill, lw);
+  let paint = fill;
+  if (typeof fill === 'string' && fill[0] === '#' && maxY > minY) {
+    const g = ctx.createLinearGradient(0, minY, 0, maxY);
+    g.addColorStop(0, shade(fill, 0.25));
+    g.addColorStop(1, shade(fill, -0.3));
+    paint = g;
+  }
+  strokeFill(ctx, paint, lw);
 }
 
 function drawLegs(ctx, frame, x, y) {
@@ -253,12 +293,15 @@ export function getSpriteMaps(kind) {
   if (CACHE[kind]) return CACHE[kind];
   const frames = {};
   for (const f of ['idle', 'walk', 'attack']) {
-    const { c, ctx } = canvas(128, 160);
+    const { c, ctx } = canvas(256, 320);
+    ctx.scale(2, 2);
     DRAW[kind](ctx, f);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.minFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = true;
+    tex.anisotropy = 8;
     frames[f] = tex;
   }
   CACHE[kind] = frames;
@@ -290,11 +333,27 @@ export function makeArrowTex() {
 export function makeShadowTex() {
   if (CACHE.shadow) return CACHE.shadow;
   const { c, ctx } = canvas(64, 64);
-  const g = ctx.createRadialGradient(32, 32, 4, 32, 32, 28);
-  g.addColorStop(0, 'rgba(20,10,4,0.45)');
-  g.addColorStop(1, 'rgba(20,10,4,0)');
+  const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+  g.addColorStop(0, 'rgba(10,6,4,0.55)');
+  g.addColorStop(0.5, 'rgba(10,6,4,0.3)');
+  g.addColorStop(1, 'rgba(10,6,4,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 64, 64);
   CACHE.shadow = new THREE.CanvasTexture(c);
   return CACHE.shadow;
+}
+
+export function makeRingTex() {
+  if (CACHE.ring) return CACHE.ring;
+  const { c, ctx } = canvas(128, 128);
+  const g = ctx.createRadialGradient(64, 64, 40, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.15)');
+  g.addColorStop(0.72, 'rgba(255,255,255,1)');
+  g.addColorStop(0.86, 'rgba(255,255,255,0.9)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  CACHE.ring = new THREE.CanvasTexture(c);
+  return CACHE.ring;
 }

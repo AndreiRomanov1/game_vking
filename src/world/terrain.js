@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { WORLD } from '../config.js';
 import { fbm, terrainHeight } from './map.js';
+import { grassDetail, sandDetail, stone, noiseTexture } from '../gfx/textures.js';
 
 export function createTerrain(scene) {
   const w = 86;
   const d = 92;
-  const seg = 96;
+  const seg = 128;
   const geo = new THREE.PlaneGeometry(w, d, seg, seg);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -19,23 +20,24 @@ export function createTerrain(scene) {
     pos.setY(i, h);
     const n = fbm(x * 0.2, z * 0.2);
     if (h < 0.04) {
-      col.set(0x2f6d62);
+      col.set(0x3a7a68);
     } else if (z > WORLD.seaZ - 1.8) {
-      col.setRGB(0.92 - n * 0.08, 0.72 - n * 0.05, 0.42);
-      if (z > WORLD.seaZ - 0.7) col.lerp(new THREE.Color(0xc4894a), 0.45);
+      col.setRGB(0.9 - n * 0.08, 0.72 - n * 0.05, 0.46);
+      if (z > WORLD.seaZ - 0.7) col.lerp(new THREE.Color(0xb98244), 0.5);
     } else if (z > WORLD.beachZ0 - 0.4) {
       const t = THREE.MathUtils.clamp((WORLD.seaZ - 1.2 - z) / 7, 0, 1);
-      col.setRGB(0.94, 0.76, 0.45).lerp(new THREE.Color(0x5dcc55), t * 0.55);
+      col.setRGB(0.95, 0.8, 0.52).lerp(new THREE.Color(0x63c455), t * 0.6);
       col.offsetHSL(0, 0, (n - 0.5) * 0.08);
     } else if (Math.abs(x) < 14 && z < 6.2 && z > -12) {
-      col.setRGB(0.42 + n * 0.1, 0.66 + n * 0.1, 0.22);
+      col.setRGB(0.46 + n * 0.1, 0.7 + n * 0.1, 0.26);
       if (Math.abs(x) < 1.6 && z < 5.5 && z > -8) {
-        col.setRGB(0.72, 0.52, 0.28);
+        col.setRGB(0.66, 0.5, 0.3);
       }
     } else if (h > 2.2) {
-      col.setRGB(0.55 + n * 0.1, 0.58, 0.5);
+      const rock = THREE.MathUtils.clamp((h - 2.2) / 3, 0, 1);
+      col.setRGB(0.3 + n * 0.1, 0.62 + n * 0.12, 0.24).lerp(new THREE.Color(0x8c8478), rock * 0.85);
     } else {
-      col.setRGB(0.18 + n * 0.1, 0.58 + n * 0.16, 0.16);
+      col.setRGB(0.22 + n * 0.1, 0.62 + n * 0.16, 0.18);
       col.offsetHSL((n - 0.5) * 0.04, 0.05, (n - 0.5) * 0.06);
     }
     colors[i * 3] = col.r;
@@ -45,10 +47,65 @@ export function createTerrain(scene) {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
 
-  const mat = new THREE.MeshLambertMaterial({
+  const grass = grassDetail();
+  const sand = sandDetail();
+  grass.map.repeat.set(34, 36);
+  grass.normalMap.repeat.set(34, 36);
+
+  const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    flatShading: false,
+    map: grass.map,
+    normalMap: grass.normalMap,
+    normalScale: new THREE.Vector2(0.55, 0.55),
+    roughness: 0.95,
+    metalness: 0,
   });
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uSandMap = { value: sand.map };
+    shader.uniforms.uSandNormal = { value: sand.normalMap };
+    shader.uniforms.uSeaZ = { value: WORLD.seaZ };
+    shader.uniforms.uBeachZ = { value: WORLD.beachZ0 };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWorldPos;')
+      .replace(
+        '#include <worldpos_vertex>',
+        '#include <worldpos_vertex>\nvWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;',
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        varying vec3 vWorldPos;
+        uniform sampler2D uSandMap;
+        uniform sampler2D uSandNormal;
+        uniform float uSeaZ;
+        uniform float uBeachZ;
+        float sandMix() {
+          return smoothstep(uBeachZ - 1.6, uBeachZ + 0.8, vWorldPos.z);
+        }`,
+      )
+      .replace(
+        '#include <map_fragment>',
+        `vec4 grassTex = texture2D(map, vMapUv);
+        vec4 sandTex = texture2D(uSandMap, vMapUv * 1.9);
+        float sandy = sandMix();
+        diffuseColor *= mix(grassTex, sandTex, sandy);`,
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        `#ifdef USE_NORMALMAP_TANGENTSPACE
+        vec3 mapN = mix(texture2D(normalMap, vNormalMapUv).xyz, texture2D(uSandNormal, vNormalMapUv * 1.9).xyz, sandMix()) * 2.0 - 1.0;
+        mapN.xy *= normalScale;
+        normal = normalize(tbn * mapN);
+        #endif`,
+      )
+      .replace(
+        '#include <roughnessmap_fragment>',
+        `#include <roughnessmap_fragment>
+        float wet = smoothstep(uSeaZ - 3.6, uSeaZ - 0.4, vWorldPos.z);
+        roughnessFactor = mix(roughnessFactor, 0.3, wet);`,
+      );
+  };
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
   mesh.castShadow = false;
@@ -65,35 +122,43 @@ export function createTerrain(scene) {
 }
 
 function createFoam() {
-  const geo = new THREE.PlaneGeometry(78, 3.6, 40, 4);
+  const geo = new THREE.PlaneGeometry(80, 3.8, 48, 4);
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
-    toneMapped: false,
     uniforms: {
       uTime: { value: 0 },
       uColor: { value: new THREE.Color('#f3fff8') },
+      uNoise: { value: noiseTexture() },
     },
     vertexShader: `
       varying vec2 vUv;
+      varying vec3 vWorld;
       uniform float uTime;
       void main() {
         vUv = uv;
         vec3 p = position;
-        p.y += sin(position.x * 0.6 + uTime * 2.4) * 0.05;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        p.y += sin(position.x * 0.6 + uTime * 2.4) * 0.04;
+        vec4 wp = modelMatrix * vec4(p, 1.0);
+        vWorld = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
       }
     `,
     fragmentShader: `
       varying vec2 vUv;
+      varying vec3 vWorld;
       uniform float uTime;
       uniform vec3 uColor;
+      uniform sampler2D uNoise;
       void main() {
-        float w = sin(vUv.x * 28.0 + uTime * 3.0) * 0.5 + 0.5;
+        float n = texture2D(uNoise, vWorld.xz * 0.12 + vec2(uTime * 0.03, uTime * 0.05)).r;
+        float w = sin(vUv.x * 26.0 + uTime * 2.6 + n * 5.0) * 0.5 + 0.5;
         float band = smoothstep(0.0, 0.35, vUv.y) * smoothstep(1.0, 0.45, vUv.y);
-        float a = band * (0.22 + 0.45 * w) * (0.55 + 0.45 * sin(vUv.x * 10.0 - uTime));
-        gl_FragColor = vec4(uColor, a);
+        float a = band * (0.18 + 0.4 * w) * smoothstep(0.35, 0.7, n + w * 0.25);
+        gl_FragColor = vec4(uColor, a * 0.85);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
       }
     `,
   });
@@ -106,14 +171,28 @@ function createFoam() {
 
 function createSideCliffs() {
   const g = new THREE.Group();
-  const rockMat = new THREE.MeshLambertMaterial({ color: 0x8d7b68, flatShading: true });
-  const moss = new THREE.MeshLambertMaterial({ color: 0x4a8a3a, flatShading: true });
+  const st = stone(4);
+  const rockMat = new THREE.MeshStandardMaterial({
+    color: 0x9a8b78,
+    map: st.map,
+    normalMap: st.normalMap,
+    normalScale: new THREE.Vector2(0.8, 0.8),
+    roughness: 0.92,
+    flatShading: true,
+  });
+  const moss = new THREE.MeshStandardMaterial({
+    color: 0x5a9a44,
+    map: st.map,
+    normalMap: st.normalMap,
+    roughness: 0.95,
+    flatShading: true,
+  });
   for (const side of [-1, 1]) {
     for (let i = 0; i < 10; i++) {
       const z = -16 + i * 4.6;
       const x = side * (22 + (i % 3) * 1.4);
       const h = 2.2 + (i % 4) * 0.7 + (z < -6 ? 2 : 0);
-      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(1.4 + (i % 3) * 0.25, 0), i % 2 ? rockMat : moss);
+      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(1.4 + (i % 3) * 0.25, 1), i % 2 ? rockMat : moss);
       m.position.set(x, terrainHeight(x, z) + h * 0.2, z);
       m.scale.set(1.6, h * 0.55, 1.8);
       m.rotation.set(0.2, i, 0.1);
