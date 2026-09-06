@@ -37,9 +37,9 @@ export function createUnit(kind, x, z, extras = {}) {
     ringGeo,
     new THREE.MeshBasicMaterial({
       map: makeRingTex(),
-      color: def.side === 'viking' ? 0x9cff5a : 0xff6a4a,
+      color: def.side === 'viking' ? 0xffd27a : 0xff6a4a,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.8,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,

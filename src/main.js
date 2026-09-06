@@ -297,7 +297,7 @@ function loop(now) {
     }
     fx.update(dt);
     floats.update(dt);
-    props.update(dt, ambient, camera);
+    props.update(dt, ambient, camera, game.look);
     rts.update(game.paused ? 0 : dt);
     updateBillboards(units, camera);
     hud.update(dt, game);
@@ -449,10 +449,11 @@ function loop(now) {
   for (const st of village.structures) {
     if (st.onFire) {
       const k = st.dead ? 0.8 : 1;
-      fx.emitFire(st.x, st.group.position.y + 1.5, st.z, dt, k);
+      const big = st.kind === 'longhouse' ? 1.9 : st.kind === 'hut' ? 1.5 : 1.25;
+      fx.emitFire(st.x, st.group.position.y + 1.5, st.z, dt, k, big);
       if (st.kind === 'longhouse') {
-        fx.emitFire(st.x - 2.4, st.group.position.y + 2.2, st.z, dt, 0.7 * k);
-        fx.emitFire(st.x + 2.4, st.group.position.y + 2.2, st.z, dt, 0.7 * k);
+        fx.emitFire(st.x - 2.4, st.group.position.y + 2.2, st.z, dt, 0.7 * k, 1.5);
+        fx.emitFire(st.x + 2.4, st.group.position.y + 2.2, st.z, dt, 0.7 * k, 1.5);
       }
     }
   }
@@ -473,7 +474,7 @@ function loop(now) {
   fx.update(dt);
   floats.update(dt);
   markers.update(dt);
-  props.update(dt, time, camera);
+  props.update(dt, time, camera, game.look);
   rts.update(dt);
   updateBillboards(units, camera);
   hud.update(dt, game);

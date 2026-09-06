@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { WORLD } from '../config.js';
 import { terrainHeight, fbm, hash2 } from './map.js';
-import { bark, planks, stone } from '../gfx/textures.js';
+import { bark, planks, stone, foliage } from '../gfx/textures.js';
 
 function windMaterial(params) {
   const mat = new THREE.MeshStandardMaterial(params);
@@ -35,11 +35,21 @@ export function createProps(scene) {
     normalMap: barkT.normalMap,
     roughness: 0.95,
   });
-  const pineA = windMaterial({ color: 0x2c6b32, roughness: 0.92, flatShading: true });
-  const pineB = windMaterial({ color: 0x3a8a3a, roughness: 0.92, flatShading: true });
-  const leafA = windMaterial({ color: 0x5fb84a, roughness: 0.85 });
-  const leafB = windMaterial({ color: 0x8ccf58, roughness: 0.85 });
-  const bushMat = windMaterial({ color: 0x4f9e40, roughness: 0.9 });
+  const leafT = foliage(6);
+  const canopy = (color, extra = {}) =>
+    windMaterial({
+      color,
+      map: leafT.map,
+      normalMap: leafT.normalMap,
+      normalScale: new THREE.Vector2(0.7, 0.7),
+      roughness: 0.78,
+      ...extra,
+    });
+  const pineA = canopy(0x86b878, { flatShading: true });
+  const pineB = canopy(0x9ccc80, { flatShading: true });
+  const leafA = canopy(0xe4ffb4);
+  const leafB = canopy(0xf4ffc8);
+  const bushMat = canopy(0xc8f0a0);
   const st = stone(4);
   const rockMat = new THREE.MeshStandardMaterial({
     color: 0xa39684,
@@ -211,8 +221,9 @@ export function createProps(scene) {
     seagulls.push(sg);
   }
 
-  function update(dt, time, camera) {
+  function update(dt, time, camera, look) {
     for (const m of windMats) m.userData.uTime.value = time;
+    const gullVis = look ? 1 - THREE.MathUtils.smoothstep(look.night, 0.15, 0.6) : 1;
     for (const ch of chickens) {
       if (ch.flee) {
         ch.x += ch.vx * dt;
@@ -244,6 +255,8 @@ export function createProps(scene) {
       );
       sg.mesh.lookAt(camera.position.x, sg.mesh.position.y, camera.position.z);
       sg.mesh.scale.y = 0.75 + Math.sin(time * 9 + i) * 0.3;
+      sg.mesh.visible = gullVis > 0.02;
+      sg.mesh.material.opacity = gullVis;
     }
   }
 

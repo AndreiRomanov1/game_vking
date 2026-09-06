@@ -348,9 +348,9 @@ export function makeRingTex() {
   const { c, ctx } = canvas(128, 128);
   const g = ctx.createRadialGradient(64, 64, 40, 64, 64, 64);
   g.addColorStop(0, 'rgba(255,255,255,0)');
-  g.addColorStop(0.55, 'rgba(255,255,255,0.15)');
-  g.addColorStop(0.72, 'rgba(255,255,255,1)');
-  g.addColorStop(0.86, 'rgba(255,255,255,0.9)');
+  g.addColorStop(0.62, 'rgba(255,255,255,0.08)');
+  g.addColorStop(0.76, 'rgba(255,255,255,0.95)');
+  g.addColorStop(0.84, 'rgba(255,255,255,0.75)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 128, 128);

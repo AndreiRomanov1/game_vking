@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WORLD } from '../config.js';
+import { WORLD, HUTS } from '../config.js';
 import { fbm, terrainHeight } from './map.js';
 import { grassDetail, sandDetail, stone, noiseTexture } from '../gfx/textures.js';
 
@@ -39,6 +39,26 @@ export function createTerrain(scene) {
     } else {
       col.setRGB(0.22 + n * 0.1, 0.62 + n * 0.16, 0.18);
       col.offsetHSL((n - 0.5) * 0.04, 0.05, (n - 0.5) * 0.06);
+    }
+    // packed earth around the huts and the longhouse
+    if (Math.abs(x) < 14 && z < 6.2 && z > -12) {
+      let worn = 0;
+      for (const hut of HUTS) {
+        const d = Math.hypot(x - hut.x, z - hut.z);
+        worn = Math.max(worn, 1 - THREE.MathUtils.smoothstep(d, hut.s * 1.1, hut.s * 2.3 + n * 0.6));
+      }
+      const lh = WORLD.longhouse;
+      const dx = Math.max(0, Math.abs(x - lh.x) - lh.w * 0.5);
+      const dz = Math.max(0, Math.abs(z - lh.z) - lh.d * 0.5);
+      worn = Math.max(worn, 1 - THREE.MathUtils.smoothstep(Math.hypot(dx, dz), 0.2, 1.8 + n * 0.5));
+      col.lerp(new THREE.Color(0.6, 0.47, 0.3), worn * 0.75);
+    }
+    // trodden path from the gate down to the sand
+    if (z > 5 && z < WORLD.beachZ0 + 1.2 && h > 0.04) {
+      const halfW = 1.5 + (n - 0.5) * 0.6;
+      const across = 1 - THREE.MathUtils.smoothstep(Math.abs(x), halfW * 0.5, halfW);
+      const along = 1 - THREE.MathUtils.smoothstep(z, WORLD.beachZ0 - 0.4, WORLD.beachZ0 + 1.2);
+      col.lerp(new THREE.Color(0.62, 0.48, 0.3), across * along * 0.9);
     }
     colors[i * 3] = col.r;
     colors[i * 3 + 1] = col.g;

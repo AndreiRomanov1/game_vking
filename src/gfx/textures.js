@@ -361,6 +361,42 @@ export function bark() {
   });
 }
 
+export function foliage(seed = 6) {
+  return memo(`foliage-${seed}`, () => {
+    const size = 256;
+    const { c, ctx } = mk(size, size);
+    const hc = mk(size, size);
+    const r = rng(seed * 419);
+    ctx.fillStyle = '#7fb84a';
+    ctx.fillRect(0, 0, size, size);
+    hc.ctx.fillStyle = '#505050';
+    hc.ctx.fillRect(0, 0, size, size);
+    const cols = ['#a8dc5a', '#8ccb4c', '#6fb43e', '#c4ec72', '#5f9d38', '#b6e066'];
+    // leaf clusters as overlapping, tiled ellipses so the texture wraps seamlessly
+    for (let i = 0; i < 1400; i++) {
+      const x = r() * size;
+      const y = r() * size;
+      const rx = 5 + r() * 9;
+      const ry = rx * (0.55 + r() * 0.3);
+      const ang = r() * Math.PI;
+      const col = cols[(r() * cols.length) | 0];
+      const hv = 90 + r() * 140;
+      for (const [ox, oy] of [[0, 0], [size, 0], [-size, 0], [0, size], [0, -size]]) {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.ellipse(x + ox, y + oy, rx, ry, ang, 0, Math.PI * 2);
+        ctx.fill();
+        hc.ctx.fillStyle = `rgb(${hv},${hv},${hv})`;
+        hc.ctx.beginPath();
+        hc.ctx.ellipse(x + ox, y + oy, rx, ry, ang, 0, Math.PI * 2);
+        hc.ctx.fill();
+      }
+    }
+    const h = heightFromCanvas(hc.c);
+    return { map: colorTex(c), normalMap: heightToNormalTexture(h, size, 1.6) };
+  });
+}
+
 export function waterNormal() {
   return memo('waterNormal', () => {
     const size = 256;
@@ -411,20 +447,26 @@ export function smokeParticle() {
   return memo('smokeParticle', () => {
     const size = 128;
     const { c, ctx } = mk(size, size);
-    const n = noiseData(size, 4, 4, 91);
+    const n = noiseData(size, 3, 5, 91);
+    const n2 = noiseData(size, 7, 3, 93);
     const img = ctx.createImageData(size, size);
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const dx = (x - size / 2) / (size / 2);
         const dy = (y - size / 2) / (size / 2);
-        const d = Math.hypot(dx, dy);
         const i = y * size + x;
+        // warp the radius with noise so the puff has a ragged, cauliflower silhouette
+        const d = Math.hypot(dx, dy) * (0.78 + (n[i] - 0.5) * 0.75);
         const soft = Math.max(0, 1 - d * d);
-        const a = soft * soft * (0.55 + n[i] * 0.8);
-        img.data[i * 4] = 255;
-        img.data[i * 4 + 1] = 255;
-        img.data[i * 4 + 2] = 255;
-        img.data[i * 4 + 3] = Math.min(255, a * 255);
+        const body = soft * soft * (0.45 + n2[i] * 0.9);
+        const a = Math.min(1, body * 1.15);
+        // fake top-left lighting so puffs read as volumes rather than discs
+        const lit = 0.62 + 0.38 * Math.max(0, 1 - Math.hypot(dx + 0.35, dy + 0.35) * 0.9) + (n2[i] - 0.5) * 0.25;
+        const v = Math.min(255, 255 * lit);
+        img.data[i * 4] = v;
+        img.data[i * 4 + 1] = v;
+        img.data[i * 4 + 2] = v;
+        img.data[i * 4 + 3] = a * 255;
       }
     }
     ctx.putImageData(img, 0, 0);

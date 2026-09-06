@@ -14,10 +14,10 @@ const GradeShader = {
     tDiffuse: { value: null },
     uTime: { value: 0 },
     uVignette: { value: 0.32 },
-    uGrain: { value: 0.028 },
+    uGrain: { value: 0.014 },
     uSaturation: { value: 1.12 },
     uContrast: { value: 1.06 },
-    uAberration: { value: 0.0022 },
+    uAberration: { value: 0.0011 },
     uWarmth: { value: 0 },
   },
   vertexShader: `
@@ -78,11 +78,11 @@ export function createPostFx(renderer, scene, camera, opts = {}) {
   const renderPass = new RenderPass(scene, camera);
   const gtao = new GTAOPass(scene, camera, size.x, size.y);
   gtao.output = GTAOPass.OUTPUT.Default;
-  gtao.blendIntensity = 0.8;
+  gtao.blendIntensity = 0.62;
   gtao.updateGtaoMaterial({
-    radius: 0.9,
+    radius: 0.7,
     distanceExponent: 1.4,
-    thickness: 1.1,
+    thickness: 0.9,
     scale: 1.0,
     samples: 12,
     distanceFallOff: 1.0,
@@ -128,7 +128,7 @@ export function createPostFx(renderer, scene, camera, opts = {}) {
     bloom.enabled = l >= 1;
     bloom.strength = l >= 3 ? 0.34 : 0.26;
     grade.enabled = true;
-    grade.uniforms.uGrain.value = l >= 2 ? 0.028 : 0.012;
+    grade.uniforms.uGrain.value = l >= 2 ? 0.014 : 0.008;
     renderer.shadowMap.enabled = true;
     resize();
     opts.onLevel?.(l);

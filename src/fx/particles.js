@@ -103,23 +103,25 @@ export function createFx(scene) {
   const wind = new THREE.Vector2(0.55, 0.2);
   let time = 0;
   let smokeTint = new THREE.Color(0.55, 0.52, 0.5);
+  let sizeMul = 1;
 
   function spawn(type, x, y, z, o) {
     const layer = TYPES[type].additive ? layers.add : layers.norm;
     if (layer.count >= layer.capacity) return;
     layer.count++;
+    const lift = Math.sqrt(sizeMul);
     particles.push({
       type,
       x,
       y,
       z,
       vx: o.vx || 0,
-      vy: o.vy || 0,
+      vy: (o.vy || 0) * lift,
       vz: o.vz || 0,
-      life: o.life,
-      maxLife: o.life,
-      size: o.size,
-      size1: o.size1 ?? o.size,
+      life: o.life * (0.7 + 0.3 * lift),
+      maxLife: o.life * (0.7 + 0.3 * lift),
+      size: o.size * sizeMul,
+      size1: (o.size1 ?? o.size) * sizeMul,
       rot: Math.random() * Math.PI * 2,
       rotV: o.rotV || 0,
       gravity: o.gravity || 0,
@@ -264,10 +266,15 @@ export function createFx(scene) {
     }
   }
 
-  function emitFire(x, y, z, dt, intensity = 1) {
-    if (Math.random() < dt * 22 * intensity) burst(x, y, z, 'fire', 1);
-    if (Math.random() < dt * 9 * intensity) burst(x, y + 0.4, z, 'smoke', 1);
+  function emitFire(x, y, z, dt, intensity = 1, scale = 1) {
+    const spread = 0.5 * (scale - 1);
+    sizeMul = scale;
+    if (Math.random() < dt * 22 * intensity) {
+      burst(x + (Math.random() - 0.5) * spread, y, z + (Math.random() - 0.5) * spread, 'fire', 1);
+    }
+    if (Math.random() < dt * 9 * intensity) burst(x, y + 0.4 * scale, z, 'smoke', 1);
     if (Math.random() < dt * 7 * intensity) burst(x, y + 0.2, z, 'ember', 1);
+    sizeMul = 1;
   }
 
   function emitSmoke(x, y, z, dt, rate = 3) {

@@ -25,13 +25,13 @@ function blocked(x, z) {
   const h = terrainHeight(x, z);
   if (h < 0.12) return true;
   if (z > WORLD.beachZ0 - 0.6) return true;
-  if (Math.abs(x) < 1.9 && z < 6.4 && z > -8.8) return true;
+  if (Math.abs(x) < 1.9 && z < 8.2 && z > -8.8) return true;
   const lh = WORLD.longhouse;
-  if (Math.abs(x - lh.x) < lh.w * 0.5 + 0.5 && Math.abs(z - lh.z) < lh.d * 0.5 + 0.7) return true;
+  if (Math.abs(x - lh.x) < lh.w * 0.5 + 1.0 && Math.abs(z - lh.z) < lh.d * 0.5 + 1.1) return true;
   for (const hut of HUTS) {
     const dx = x - hut.x;
     const dz = z - hut.z;
-    if (dx * dx + dz * dz < (1.5 * hut.s) ** 2) return true;
+    if (dx * dx + dz * dz < (1.8 * hut.s) ** 2) return true;
   }
   const p = WORLD.palisade;
   const nearWallX = (Math.abs(x - p.minX) < 0.5 || Math.abs(x - p.maxX) < 0.5) && z > p.minZ - 0.5 && z < p.maxZ + 0.5;
@@ -101,8 +101,10 @@ export function createGrass(scene, opts = {}) {
   const mat = new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
     fog: true,
+    lights: true,
     uniforms: THREE.UniformsUtils.merge([
       THREE.UniformsLib.fog,
+      THREE.UniformsLib.lights,
       {
         uTime: { value: 0 },
         uWind: { value: new THREE.Vector2(0.8, 0.35) },
@@ -111,6 +113,7 @@ export function createGrass(scene, opts = {}) {
         uTipB: { value: new THREE.Color(flowers ? '#ffffff' : tip) },
         uLight: { value: new THREE.Color('#ffffff') },
         uLevel: { value: 1 },
+        uShadowMix: { value: 0.55 },
         uFlower: { value: flowers ? 1 : 0 },
       },
     ]),
@@ -124,7 +127,9 @@ export function createGrass(scene, opts = {}) {
       uniform vec2 uWind;
       varying float vH;
       varying float vTint;
+      #include <common>
       #include <fog_pars_vertex>
+      #include <shadowmap_pars_vertex>
       void main() {
         vH = position.y / ${height.toFixed(3)};
         vTint = aTint;
@@ -138,9 +143,13 @@ export function createGrass(scene, opts = {}) {
         float sway = sin(uTime * 1.9 + aPhase + aOffset.x * 0.35 + aOffset.z * 0.2) * (0.35 + gust * 0.65)
           + sin(uTime * 3.3 + aPhase * 1.7) * 0.15;
         rp.xz += uWind * sway * vH * vH * 0.42 * aScale;
-        vec3 world = aOffset + rp;
-        vec4 mvPosition = viewMatrix * vec4(world, 1.0);
+        vec4 worldPosition = vec4(aOffset + rp, 1.0);
+        vec4 mvPosition = viewMatrix * worldPosition;
         gl_Position = projectionMatrix * mvPosition;
+        #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+          vDirectionalShadowCoord[ 0 ] = directionalShadowMatrix[ 0 ]
+            * (worldPosition + vec4(0.0, directionalLightShadows[ 0 ].shadowNormalBias, 0.0, 0.0));
+        #endif
         #include <fog_vertex>
       }
     `,
@@ -150,16 +159,25 @@ export function createGrass(scene, opts = {}) {
       uniform vec3 uTipB;
       uniform vec3 uLight;
       uniform float uLevel;
+      uniform float uShadowMix;
       uniform float uFlower;
       varying float vH;
       varying float vTint;
+      #include <common>
+      #include <packing>
       #include <fog_pars_fragment>
+      #include <shadowmap_pars_fragment>
       void main() {
         vec3 tipCol = mix(uTip, uTipB, step(0.5, vTint));
         float k = uFlower > 0.5 ? smoothstep(0.55, 0.8, vH) : vH;
         vec3 col = mix(uBase, tipCol, k) * (0.82 + vTint * 0.36);
         float shade = uFlower > 0.5 ? 0.75 + k * 0.5 : 0.45 + vH * 0.75;
-        col *= uLight * uLevel * shade;
+        float shadow = 1.0;
+        #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+          DirectionalLightShadow ds = directionalLightShadows[ 0 ];
+          shadow = getShadow(directionalShadowMap[ 0 ], ds.shadowMapSize, ds.shadowIntensity, ds.shadowBias, ds.shadowRadius, vDirectionalShadowCoord[ 0 ]);
+        #endif
+        col *= uLight * uLevel * shade * mix(1.0, shadow, uShadowMix);
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -177,8 +195,10 @@ export function createGrass(scene, opts = {}) {
   function update(time, look) {
     mat.uniforms.uTime.value = time;
     if (look) {
-      mat.uniforms.uLight.value.copy(look.lightColor).lerp(new THREE.Color('#ffffff'), 0.35);
-      mat.uniforms.uLevel.value = 0.28 + look.lightLevel * 0.8;
+      mat.uniforms.uLight.value.copy(look.lightColor).lerp(new THREE.Color('#ffffff'), 0.35 - look.night * 0.2);
+      mat.uniforms.uLevel.value = 0.14 + look.lightLevel * 0.92;
+      // the sun is the only shadow caster; once it sets the shadow map no longer means anything
+      mat.uniforms.uShadowMix.value = 0.55 * look.sunUp * (1 - look.night);
     }
   }
 

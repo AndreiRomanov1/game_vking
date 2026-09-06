@@ -329,8 +329,8 @@ export function createDayCycle(scene, renderer) {
     look.torchT = torchSmooth;
     look.skyTop.copy(top);
     look.skyHorizon.copy(hor);
-    look.waterDeep.set('#0f5f78').lerp(new THREE.Color('#0a2e4a'), k2).lerp(new THREE.Color('#040d1c'), k3);
-    look.waterShallow.set('#2cb8b8').lerp(new THREE.Color('#3a7a9a'), k2).lerp(new THREE.Color('#0f2438'), k3);
+    look.waterDeep.set('#0a4c6a').lerp(new THREE.Color('#0a2e4a'), k2).lerp(new THREE.Color('#040d1c'), k3);
+    look.waterShallow.set('#22a4b8').lerp(new THREE.Color('#3a7a9a'), k2).lerp(new THREE.Color('#0f2438'), k3);
     look.foam.set('#eefff8').lerp(new THREE.Color('#7a8aa8'), k3);
     look.lightColor.copy(sunCol).lerp(new THREE.Color('#6a86c8'), nightS);
     look.lightLevel = 0.25 + 0.75 * Math.max(0, sunDir.y) * (1 - nightS) + nightS * 0.16;
