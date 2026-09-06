@@ -1,0 +1,189 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1c28;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  user-select: none;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+}
+
+#select-box {
+  position: fixed;
+  display: none;
+  pointer-events: none;
+  border: 1.5px solid #ffe08a;
+  background: rgba(255, 196, 72, 0.14);
+  z-index: 5;
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  color: #fff6d8;
+}
+
+.hud-top {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  text-shadow: 0 2px 0 #3a1c08, 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.hud-title {
+  font-size: 34px;
+  letter-spacing: 0.18em;
+  font-weight: 800;
+}
+
+.hud-sub {
+  margin-top: 2px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+}
+
+.hud-caption {
+  position: absolute;
+  top: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 0 #4a1408, 0 8px 22px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.4s ease;
+}
+
+.day-wrap {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  width: 220px;
+}
+
+.day-label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  text-align: right;
+  text-shadow: 0 2px 6px #000;
+}
+
+.day-bar {
+  height: 10px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #7ec8ff, #ffe27a, #ff7a3a, #1b2347);
+  box-shadow: inset 0 0 0 2px rgba(40, 18, 8, 0.65), 0 4px 10px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  position: relative;
+}
+
+.day-needle {
+  position: absolute;
+  top: -3px;
+  width: 4px;
+  height: 16px;
+  margin-left: -2px;
+  background: #fff8e4;
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px #3a1c08;
+}
+
+.hud-help {
+  position: absolute;
+  left: 18px;
+  bottom: 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  background: rgba(28, 14, 8, 0.42);
+  border: 2px solid rgba(255, 214, 120, 0.28);
+  border-radius: 12px;
+  padding: 10px 14px;
+  text-shadow: 0 1px 2px #000;
+}
+
+.hud-sel {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  min-width: 180px;
+  background: rgba(28, 14, 8, 0.42);
+  border: 2px solid rgba(255, 214, 120, 0.28);
+  border-radius: 12px;
+  padding: 10px 14px;
+  text-shadow: 0 1px 2px #000;
+}
+
+.hud-sel b {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.banner {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-shadow: 0 3px 0 #3a1408, 0 16px 40px rgba(0, 0, 0, 0.55);
+  display: none;
+}
+
+.banner.show {
+  display: block;
+}
+
+.float-text {
+  position: absolute;
+  pointer-events: none;
+  font-weight: 800;
+  font-size: 16px;
+  text-shadow: 0 2px 0 #2a1008, 0 4px 8px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+.hp-bar {
+  position: absolute;
+  width: 34px;
+  height: 5px;
+  margin-left: -17px;
+  background: #2a140c;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 #000;
+}
+
+.hp-bar > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(#9dff6a, #3dbb2a);
+}
+
+.hp-bar.enemy > i {
+  background: linear-gradient(#ffb24a, #e24a2a);
+}
