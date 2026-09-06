@@ -78,6 +78,8 @@ export function createUnit(kind, x, z, extras = {}) {
     ship: extras.ship || null,
     local: extras.local || null,
     facing: 1,
+    buffs: { rage: 0, wall: 0, volley: 0 },
+    abilityCd: { rage: 0, wall: 0, volley: 0 },
   };
   place(unit);
   return unit;

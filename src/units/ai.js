@@ -1,5 +1,7 @@
 import { findPath, formationSlots } from './pathfinding.js';
 import { nearestEnemy, nearestBuilding, tryAttack } from './combat.js';
+import { moveSpeed } from '../abilities.js';
+import { WORLD } from '../config.js';
 
 export function orderMove(units, map, x, z, attackMove = false) {
   const alive = units.filter((u) => !u.dead);
@@ -46,7 +48,7 @@ export function updateMovement(units, map, dt) {
     const dx = p.x - u.x;
     const dz = p.z - u.z;
     const dist = Math.hypot(dx, dz);
-    const step = u.def.speed * dt;
+    const step = moveSpeed(u) * dt;
     if (dist <= step + 0.05) {
       u.x = p.x;
       u.z = p.z;
@@ -88,25 +90,52 @@ export function updateMovement(units, map, dt) {
   }
 }
 
-export function updateVikingAuto(units, buildings, combat, scene, dt) {
+export function orderStop(units) {
+  for (const u of units) {
+    if (u.dead) continue;
+    u.path = [];
+    u.pathI = 0;
+    u.target = null;
+    u.order = 'idle';
+    u.state = 'idle';
+  }
+}
+
+export function orderHold(units) {
+  for (const u of units) {
+    if (u.dead) continue;
+    u.path = [];
+    u.pathI = 0;
+    u.target = null;
+    u.order = 'hold';
+    u.state = 'idle';
+  }
+}
+
+export function updateVikingAuto(units, buildings, combat, scene, dt, nightT = 0) {
   for (const u of units) {
     if (u.dead || u.side !== 'viking') continue;
     if (u.state === 'aboard' || u.state === 'jump') continue;
-    if (u.order !== 'attack-move' && u.order !== 'attack') continue;
+    if (u.order === 'idle' || u.order === 'move') continue;
+    if (u.order === 'hold') {
+      const enemy = nearestEnemy(u, units, u.def.range + 0.4);
+      if (enemy) tryAttack(u, enemy, buildings, combat, scene, dt, nightT);
+      continue;
+    }
     if (u.order === 'attack' && u.target && !u.target.dead) {
-      if (tryAttack(u, u.target, buildings, combat, scene, dt)) {
+      if (tryAttack(u, u.target, buildings, combat, scene, dt, nightT)) {
         u.path = [];
       }
       continue;
     }
     const enemy = nearestEnemy(u, units, u.def.melee ? 7 : 11);
-    if (enemy && tryAttack(u, enemy, buildings, combat, scene, dt)) {
+    if (enemy && tryAttack(u, enemy, buildings, combat, scene, dt, nightT)) {
       u.path = [];
       continue;
     }
     if (u.order === 'attack-move') {
       const b = nearestBuilding(u, buildings, u.def.melee ? 4 : 10);
-      if (b && tryAttack(u, b, buildings, combat, scene, dt)) u.path = [];
+      if (b && tryAttack(u, b, buildings, combat, scene, dt, nightT)) u.path = [];
     }
   }
 }
@@ -116,9 +145,20 @@ export function updateDefenders(units, buildings, map, combat, scene, dt, alert)
     if (u.dead || u.side !== 'defend') continue;
     const aggro = u.kind === 'chief' ? 11 : u.def.melee ? 13 : 14;
     const enemy = nearestEnemy(u, units, alert ? aggro + 8 : aggro);
+    const guardHall =
+      u.kind === 'chief' || (u.kind === 'militia' && u.home.z < -2.8);
     if (enemy) {
-      if (tryAttack(u, enemy, buildings, combat, scene, dt)) {
+      if (tryAttack(u, enemy, buildings, combat, scene, dt, 0)) {
         u.path = [];
+        continue;
+      }
+      const enemyAtHall = Math.hypot(enemy.x - WORLD.longhouse.x, enemy.z - WORLD.longhouse.z) < 9;
+      if (guardHall && alert && !enemyAtHall) {
+        if (Math.hypot(u.x - u.home.x, u.z - u.home.z) > 1.8 && !u.path.length) {
+          u.path = findPath(map, u.x, u.z, u.home.x, u.home.z);
+          u.pathI = 0;
+          u.state = 'move';
+        }
         continue;
       }
       if (u.def.melee || alert) {

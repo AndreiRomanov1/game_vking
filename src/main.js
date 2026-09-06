@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DEFENDERS, FUN_LINES } from './config.js';
+import { DEFENDERS, FUN_LINES, LOOT } from './config.js';
 import { createRtsCamera } from './camera.js';
 import { createDayCycle } from './daycycle.js';
 import { createMap, terrainHeight } from './world/map.js';
@@ -7,19 +7,18 @@ import { createTerrain, updateTerrain } from './world/terrain.js';
 import { createWater, updateWater } from './world/water.js';
 import { createVillage } from './world/village.js';
 import { createProps } from './world/props.js';
+import { createVillagers, updateVillagers } from './world/villagers.js';
 import { createShips, updateShips, deckWorld } from './world/ships.js';
 import { createUnit, place, addUnitToScene, updateBillboards } from './units/unit.js';
 import { createCombat, resolveMelee } from './units/combat.js';
-import {
-  updateMovement,
-  updateVikingAuto,
-  updateDefenders,
-  orderMove,
-  disembark,
-} from './units/ai.js';
+import { updateMovement, updateVikingAuto, updateDefenders, disembark } from './units/ai.js';
+import { applySelection } from './units/selection.js';
+import { tickBuffs } from './abilities.js';
 import { createFx } from './fx/particles.js';
 import { createFloatingText } from './fx/floatingText.js';
 import { createHud } from './ui/hud.js';
+import { createMarkers } from './ui/markers.js';
+import { createAudio } from './audio.js';
 import { bindInput } from './input.js';
 
 const canvas = document.getElementById('game');
@@ -45,11 +44,13 @@ const terrain = createTerrain(scene);
 const water = createWater(scene);
 const village = createVillage(scene, map, day);
 const props = createProps(scene);
+const villagers = createVillagers(scene);
 const ships = createShips(scene);
 const fx = createFx(scene);
 const combat = createCombat();
-const hud = createHud(hudRoot, canvas, camera);
 const floats = createFloatingText(hudRoot, camera, canvas);
+const markers = createMarkers(scene);
+const audio = createAudio();
 
 const units = [];
 
@@ -83,27 +84,94 @@ const game = {
   units,
   look: null,
   matchTime: 0,
+  started: false,
+  paused: false,
+  over: false,
+  gold: 0,
+  stats: { kills: 0, buildings: 0, gold: 0, time: 0 },
+  attackMovePending: false,
+  groups: { 1: [], 2: [], 3: [] },
+  rts,
+  audio,
+  floats,
+  markers,
+  hud: null,
+  startMatch: null,
+  togglePause: null,
+};
+
+const hud = createHud(hudRoot, canvas, camera, game);
+game.hud = hud;
+
+combat.onHit = () => audio.hit();
+combat.onKill = (unit, loot = 0) => {
+  if (unit.side === 'defend') game.stats.kills += 1;
+  if (loot) addGold(loot, unit.x, unit.y + 1.6, unit.z);
+};
+combat.onArrow = () => audio.arrow();
+
+function addGold(amount, x, y, z) {
+  game.gold += amount;
+  game.stats.gold += amount;
+  floats.spawn(x, y, z, `+${amount}`, '#ffe08a');
+  audio.gold();
+}
+
+function onEvent(type, st) {
+  if (type === 'structureDown') {
+    const label = st.kind === 'gate' ? FUN_LINES.gate[0] : st.kind === 'longhouse' ? 'Холл горит!' : 'Трах!';
+    floats.spawn(st.x, 2.2, st.z, label, '#ffb24a');
+    props.scareChickens(st.x, st.z);
+    const loot = LOOT[st.kind] || 20;
+    addGold(loot, st.x, 2.6, st.z);
+    game.stats.buildings += 1;
+    audio.fire();
+    if (st.kind === 'gate') {
+      hud.say(FUN_LINES.gate[0]);
+      spawnReserves();
+    }
+  }
+}
+
+let spawnedReserve = false;
+function spawnReserves() {
+  if (spawnedReserve) return;
+  spawnedReserve = true;
+  const spots = [
+    { x: -1.4, z: -6.8 },
+    { x: 1.5, z: -6.6 },
+    { x: 0.1, z: -5.4 },
+  ];
+  for (const s of spots) {
+    const u = createUnit('militia', s.x, s.z);
+    addUnitToScene(scene, u);
+    units.push(u);
+  }
+  hud.say(FUN_LINES.reserve[0]);
+}
+
+game.startMatch = () => {
+  if (game.started) return;
+  game.started = true;
+  hud.hideMenu();
+  audio.start();
+  hud.say('Драккары на горизонте!');
+  rts.setEdgeScroll(true);
+};
+
+game.togglePause = () => {
+  if (!game.started || game.over) return;
+  game.paused = !game.paused;
+  hud.setPaused(game.paused);
+  rts.setEdgeScroll(!game.paused);
 };
 
 bindInput(game);
 
 let saidLand = false;
-let orderedCharge = false;
 let saidDusk = false;
 let saidNight = false;
 let saidFire = false;
-let moodFire = false;
-let over = false;
-
-hud.say('Драккары на горизонте!');
-
-function onEvent(type, st) {
-  if (type === 'structureDown') {
-    const label = st.kind === 'gate' ? 'Ворота хрясь!' : st.kind === 'longhouse' ? 'Холл горит!' : 'Трах!';
-    floats.spawn(st.x, 2.2, st.z, label, '#ffb24a');
-    props.scareChickens(st.x, st.z);
-  }
-}
 
 function resize() {
   const w = window.innerWidth;
@@ -119,14 +187,37 @@ let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  game.matchTime += dt;
-  const time = game.matchTime;
+  const time = game.started && !game.paused ? (game.matchTime += dt) : game.matchTime;
 
   const burning = village.structures.filter((s) => s.onFire).length;
   game.look = day.update(time, burning * 0.22);
   updateWater(water, time, game.look);
   updateTerrain(terrain, time);
+
+  if (!game.started || game.paused) {
+    updateShips(ships, 0, time, fx);
+    for (const u of units) {
+      if (u.state === 'aboard' && u.ship) {
+        const p = deckWorld(u.ship, u.local.x, u.local.z);
+        u.x = p.x;
+        u.z = p.z;
+        u.y = p.y;
+        place(u);
+      }
+    }
+    fx.update(dt);
+    floats.update(dt);
+    props.update(dt, time, camera);
+    rts.update(game.paused ? 0 : dt);
+    updateBillboards(units, camera);
+    hud.update(dt, game);
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+    return;
+  }
+
   updateShips(ships, dt, time, fx);
+  tickBuffs(units, dt);
 
   const torchOn = game.look.torchT > 0.12;
   for (const spr of village.torchSprites) {
@@ -170,6 +261,11 @@ function loop(now) {
     saidLand = true;
     hud.say(FUN_LINES.land[0]);
     floats.spawn(0, 2, 12, 'К берегу!', '#ffe08a');
+    audio.land();
+    applySelection(
+      units,
+      units.filter((u) => u.side === 'viking' && !u.dead),
+    );
   }
 
   for (const u of units) {
@@ -188,19 +284,16 @@ function loop(now) {
     place(u);
   }
 
-  if (saidLand && !orderedCharge && time > 11.2) {
-    orderedCharge = true;
-    const viks = units.filter((u) => u.side === 'viking' && !u.dead && u.state !== 'aboard');
-    orderMove(viks, map, 0.1, 5.0, true);
-    hud.say('На ворота!');
-  }
-
   const alert = village.gate.dead || village.structures.some((s) => s.onFire);
   updateMovement(units, map, dt);
-  updateVikingAuto(units, village.structures, combat, scene, dt);
+  updateVikingAuto(units, village.structures, combat, scene, dt, game.look.k3);
   updateDefenders(units, village.structures, map, combat, scene, dt, alert);
-  resolveMelee(units, village.structures, fx, floats, map, onEvent);
+  resolveMelee(units, village.structures, fx, floats, map, onEvent, combat);
   combat.update(dt, units, village.structures, scene, fx, floats, map, onEvent);
+  updateVillagers(villagers, units, dt, camera, (v, amount) => {
+    addGold(amount, v.x, v.y + 1.4, v.z);
+    floats.spawn(v.x, v.y + 1.8, v.z, FUN_LINES.loot[(Math.random() * FUN_LINES.loot.length) | 0], '#fff0c8');
+  });
 
   for (const u of units) {
     if (u.dead) {
@@ -231,7 +324,14 @@ function loop(now) {
       u.mesh.scale.y = u.def.scale;
     }
     u.mesh.scale.x = u.def.scale * (u.facing || 1);
-    if (u.hitFlash > 0) {
+    if (u.buffs.rage > 0) {
+      u.mat.emissive.setHex(0xff4020);
+      u.mat.emissiveIntensity = 1.15;
+      u.mesh.scale.y *= 1.06;
+    } else if (u.buffs.wall > 0) {
+      u.mat.emissive.setHex(0x4a88ff);
+      u.mat.emissiveIntensity = 0.95;
+    } else if (u.hitFlash > 0) {
       u.hitFlash -= dt;
       u.mat.emissive.setHex(0xfff2aa);
       u.mat.emissiveIntensity = 0.9;
@@ -246,14 +346,6 @@ function loop(now) {
 
   for (const st of village.structures) {
     if (st.onFire) fx.emitFire(st.x, st.group.position.y + 1.5, st.z, dt);
-  }
-
-  if (!moodFire && game.look.k3 > 0.12) {
-    const hut = village.structures.find((s) => s.kind === 'hut' && !s.dead);
-    if (hut && !village.structures.some((s) => s.onFire)) {
-      hut.onFire = true;
-      moodFire = true;
-    }
   }
 
   if (game.look.phase === 'Закат' && !saidDusk) {
@@ -271,22 +363,27 @@ function loop(now) {
 
   fx.update(dt);
   floats.update(dt);
+  markers.update(dt);
   props.update(dt, time, camera);
   rts.update(dt);
   updateBillboards(units, camera);
   hud.update(dt, game);
 
-  if (!over) {
+  if (!game.over) {
     const hall = village.structures.find((s) => s.kind === 'longhouse');
     const viks = units.filter((u) => u.side === 'viking' && !u.dead);
     const defs = units.filter((u) => u.side === 'defend' && !u.dead);
     const landed = ships.every((s) => s.spawned);
     if (hall.dead || (landed && defs.length === 0)) {
-      over = true;
-      hud.end(true);
+      game.over = true;
+      game.stats.time = time;
+      hud.end(true, game.stats);
+      audio.win();
     } else if (landed && viks.length === 0) {
-      over = true;
-      hud.end(false);
+      game.over = true;
+      game.stats.time = time;
+      hud.end(false, game.stats);
+      audio.lose();
     }
   }
 

@@ -1,8 +1,8 @@
-import * as THREE from 'three';
-import { FUN_LINES } from '../config.js';
+import { FUN_LINES, LOOT } from '../config.js';
 import { makeArrowTex } from './sprites.js';
 import { killUnit } from './unit.js';
 import { damageStructure } from '../world/village.js';
+import { attackDamage } from '../abilities.js';
 
 export function createCombat() {
   const arrows = [];
@@ -32,6 +32,8 @@ export function createCombat() {
       target: to.unit || null,
       building: to.building || null,
       life: 1.4,
+      onHit: null,
+      onKill: null,
     });
     return mesh;
   }
@@ -59,28 +61,39 @@ export function createCombat() {
     }
   }
 
-  return { shoot, update, arrows };
+  return { shoot, update, arrows, onHit: null, onKill: null, onArrow: null };
 }
 
 function pickLine(list) {
   return list[(Math.random() * list.length) | 0];
 }
 
-export function applyDamage(unit, dmg, fx, floats) {
-  if (unit.dead) return;
-  unit.hp -= dmg;
+export function applyDamage(unit, dmg, fx, floats, opts = {}) {
+  if (unit.dead) return false;
+  let taken = dmg;
+  if (unit.buffs?.wall > 0) taken *= 0.5;
+  if (unit.kind === 'shield' && opts.ranged) taken *= 0.72;
+  unit.hp -= taken;
   unit.hitFlash = 0.12;
   fx?.burst?.(unit.x, unit.y + 0.9, unit.z, 'hit', 6);
+  opts.onHit?.();
   if (Math.random() < 0.35) {
     const lines = unit.side === 'viking' ? FUN_LINES.hitViking : FUN_LINES.hitDefend;
     floats?.spawn?.(unit.x, unit.y + 1.5, unit.z, pickLine(lines), unit.side === 'viking' ? '#ffd24a' : '#fff0d0');
   }
-  if (unit.hp <= 0) killUnit(unit, fx, floats);
+  if (unit.hp <= 0) {
+    const loot = unit.kind === 'chief' ? LOOT.chief : 0;
+    killUnit(unit, fx, floats);
+    opts.onKill?.(unit, loot);
+    return true;
+  }
+  return false;
 }
 
 function applyHit(a, units, buildings, fx, floats, map, onEvent) {
+  const opts = { ranged: true, onHit: a.onHit, onKill: a.onKill };
   if (a.target && !a.target.dead) {
-    applyDamage(a.target, a.dmg, fx, floats);
+    applyDamage(a.target, a.dmg, fx, floats, opts);
     return;
   }
   if (a.building && !a.building.dead) {
@@ -97,36 +110,50 @@ function applyHit(a, units, buildings, fx, floats, map, onEvent) {
       best = u;
     }
   }
-  if (best) applyDamage(best, a.dmg, fx, floats);
+  if (best) applyDamage(best, a.dmg, fx, floats, opts);
 }
 
-export function tryAttack(unit, target, buildings, combat, scene, dt) {
+export function tryAttack(unit, target, buildings, combat, scene, dt, nightT = 0) {
   if (!target || unit.dead) return false;
-  const isB = target.building || target.kind === 'gate' || target.hp !== undefined && target.group;
+  const isB = target.building || target.kind === 'gate' || (target.hp !== undefined && target.group);
   const tx = target.x;
   const tz = target.z;
-  const range = unit.def.range + (isB ? (target.radius || 1) : target.def?.radius || 0.4);
+  const range = unit.def.range + (isB ? target.radius || 1 : target.def?.radius || 0.4);
   const d = Math.hypot(unit.x - tx, unit.z - tz);
   if (d > range + 0.15) return false;
+  unit.facing = tx >= unit.x ? 1 : -1;
   unit.cooldown -= dt;
   unit.state = 'attack';
   unit.frame = 'attack';
   if (unit.cooldown > 0) return true;
-  unit.cooldown = unit.def.cooldown;
+  let cd = unit.def.cooldown;
+  let dmg = attackDamage(unit);
+  if (unit.buffs?.volley > 0) {
+    unit.buffs.volley -= 1;
+    cd *= 0.42;
+  }
+  if (unit.side === 'viking' && nightT > 0.25) dmg *= 1.16;
+  unit.cooldown = cd;
   unit.bob += 2;
   if (unit.def.melee) {
-    unit._pendingMelee = { target, dmg: unit.def.damage };
+    unit._pendingMelee = { target, dmg };
   } else {
     const dest = isB
       ? { x: tx, z: tz, y: 1.2, building: target }
       : { x: tx, z: tz, y: target.y, unit: target };
-    const mesh = combat.shoot(unit, dest, unit.def.damage, unit.side);
+    const mesh = combat.shoot(unit, dest, dmg, unit.side);
+    const last = combat.arrows[combat.arrows.length - 1];
+    if (last) {
+      last.onHit = combat.onHit;
+      last.onKill = combat.onKill;
+    }
+    combat.onArrow?.();
     scene.add(mesh);
   }
   return true;
 }
 
-export function resolveMelee(units, buildings, fx, floats, map, onEvent) {
+export function resolveMelee(units, buildings, fx, floats, map, onEvent, combat) {
   for (const u of units) {
     const p = u._pendingMelee;
     if (!p) continue;
@@ -134,7 +161,11 @@ export function resolveMelee(units, buildings, fx, floats, map, onEvent) {
     if (p.target.group && !p.target.dead) {
       damageStructure(p.target, p.dmg, map, fx, onEvent, buildings);
     } else if (p.target.hp !== undefined && !p.target.dead && p.target.mesh) {
-      applyDamage(p.target, p.dmg, fx, floats);
+      applyDamage(p.target, p.dmg, fx, floats, {
+        ranged: false,
+        onHit: combat?.onHit,
+        onKill: combat?.onKill,
+      });
     }
   }
 }

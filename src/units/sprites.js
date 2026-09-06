@@ -206,6 +206,21 @@ function drawDArcher(ctx, frame) {
   ctx.restore();
 }
 
+function drawVillager(ctx, frame) {
+  ctx.clearRect(0, 0, 128, 160);
+  const cx = 64;
+  drawLegs(ctx, frame, cx, 118);
+  ell(ctx, cx, 96, 22, 18, '#c4a05a', 5);
+  ell(ctx, cx, 56, 18, 17, '#f0c2a0', 5);
+  ell(ctx, cx, 40, 20, 12, '#6a3a18', 4);
+  face(ctx, cx, 58, 'scared');
+  ctx.save();
+  ctx.translate(cx + 16, 86);
+  ctx.rotate(frame === 'walk' ? 0.25 : 0.05);
+  ell(ctx, 8, 10, 10, 8, '#8a4a20', 4);
+  ctx.restore();
+}
+
 function drawChief(ctx, frame) {
   ctx.clearRect(0, 0, 128, 160);
   const cx = 64;
@@ -231,6 +246,7 @@ const DRAW = {
   militia: drawMilitia,
   darcher: drawDArcher,
   chief: drawChief,
+  villager: drawVillager,
 };
 
 export function getSpriteMaps(kind) {

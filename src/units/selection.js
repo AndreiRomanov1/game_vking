@@ -79,7 +79,28 @@ export function selectInBox(units, camera, canvas, x0, y0, x1, y1) {
   return picked;
 }
 
-export function applySelection(units, picked) {
+export function applySelection(units, picked, additive = false) {
+  if (additive) {
+    const set = new Set(picked);
+    for (const u of units) {
+      if (set.has(u)) setSelected(u, !u.selected);
+    }
+    return;
+  }
   const set = new Set(picked);
   for (const u of units) setSelected(u, set.has(u));
+}
+
+export function addToSelection(units, picked) {
+  const set = new Set(picked);
+  for (const u of units) {
+    if (set.has(u)) setSelected(u, true);
+  }
+}
+
+export function selectKind(units, kind) {
+  applySelection(
+    units,
+    units.filter((u) => !u.dead && u.side === 'viking' && u.kind === kind),
+  );
 }

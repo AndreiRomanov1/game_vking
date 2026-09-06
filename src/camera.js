@@ -16,6 +16,10 @@ export function createRtsCamera(canvas) {
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
+  let pointerX = 0.5;
+  let pointerY = 0.5;
+  let pointerIn = false;
+  let edgeScroll = false;
 
   function apply() {
     const cp = Math.cos(pitch);
@@ -75,6 +79,16 @@ export function createRtsCamera(canvas) {
     { passive: false },
   );
 
+  function setPointer(nx, ny, inside) {
+    pointerX = nx;
+    pointerY = ny;
+    pointerIn = inside;
+  }
+
+  function setEdgeScroll(on) {
+    edgeScroll = on;
+  }
+
   function update(dt) {
     const sp = dist * 0.55 * dt;
     let mx = 0;
@@ -83,6 +97,13 @@ export function createRtsCamera(canvas) {
     if (keys.has('KeyS') || keys.has('ArrowDown')) mz += 1;
     if (keys.has('KeyA') || keys.has('ArrowLeft')) mx -= 1;
     if (keys.has('KeyD') || keys.has('ArrowRight')) mx += 1;
+    if (edgeScroll && pointerIn) {
+      const m = 0.035;
+      if (pointerY < m) mz -= 1;
+      if (pointerY > 1 - m) mz += 1;
+      if (pointerX < m) mx -= 1;
+      if (pointerX > 1 - m) mx += 1;
+    }
     if (mx || mz) {
       target.x += Math.cos(yaw) * mx * sp + Math.sin(yaw) * mz * sp;
       target.z += -Math.sin(yaw) * mx * sp + Math.cos(yaw) * mz * sp;
@@ -101,5 +122,5 @@ export function createRtsCamera(canvas) {
     apply();
   }
 
-  return { camera, target, update, resize, focus, apply };
+  return { camera, target, update, resize, focus, apply, setPointer, setEdgeScroll };
 }

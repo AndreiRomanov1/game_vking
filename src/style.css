@@ -39,6 +39,11 @@ body,
   color: #fff6d8;
 }
 
+.hud-play {
+  position: absolute;
+  inset: 0;
+}
+
 .hud-top {
   position: absolute;
   top: 18px;
@@ -186,4 +191,223 @@ body,
 
 .hp-bar.enemy > i {
   background: linear-gradient(#ffb24a, #e24a2a);
+}
+
+.hp-bar.build {
+  width: 46px;
+  margin-left: -23px;
+  height: 6px;
+}
+
+.hp-layer {
+  position: absolute;
+  inset: 0;
+}
+
+#game.atk-cursor {
+  cursor: crosshair;
+}
+
+.raid-panel {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  min-width: 150px;
+  background: rgba(28, 14, 8, 0.48);
+  border: 2px solid rgba(255, 214, 120, 0.28);
+  border-radius: 12px;
+  padding: 10px 14px;
+  text-shadow: 0 1px 2px #000;
+}
+
+.raid-gold {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #ffe08a;
+}
+
+.raid-counts {
+  margin-top: 2px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.mute-btn {
+  pointer-events: auto;
+  position: absolute;
+  top: 58px;
+  right: 22px;
+  background: rgba(28, 14, 8, 0.5);
+  color: #fff6d8;
+  border: 2px solid rgba(255, 214, 120, 0.3);
+  border-radius: 8px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.mute-btn.off {
+  opacity: 0.55;
+}
+
+.minimap {
+  pointer-events: auto;
+  position: absolute;
+  left: 18px;
+  bottom: 132px;
+  width: 168px;
+  height: 168px;
+  border: 2px solid rgba(255, 214, 120, 0.4);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.minimap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.abil-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.abil {
+  pointer-events: auto;
+  background: rgba(80, 36, 12, 0.75);
+  color: #fff6d8;
+  border: 2px solid rgba(255, 210, 110, 0.45);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.abil i {
+  display: inline-block;
+  margin-right: 5px;
+  color: #ffe08a;
+  font-style: normal;
+}
+
+.abil.cd {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.hud-sel {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: rgba(8, 16, 24, 0.55);
+  pointer-events: auto;
+  z-index: 12;
+}
+
+.overlay.show {
+  display: grid;
+}
+
+.panel {
+  width: min(460px, calc(100vw - 32px));
+  background: linear-gradient(180deg, rgba(72, 32, 12, 0.92), rgba(24, 12, 8, 0.94));
+  border: 3px solid rgba(255, 210, 120, 0.45);
+  border-radius: 18px;
+  padding: 28px 30px 24px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.panel-kicker {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.panel h1 {
+  font-size: 42px;
+  letter-spacing: 0.16em;
+  margin: 6px 0 12px;
+  text-shadow: 0 3px 0 #3a1408;
+}
+
+.panel p {
+  font-size: 15px;
+  line-height: 1.45;
+  opacity: 0.92;
+  margin-bottom: 18px;
+}
+
+.panel-hint {
+  margin-top: 12px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.btn {
+  pointer-events: auto;
+  background: linear-gradient(#e8b24a, #c45a20);
+  color: #2a1408;
+  border: 2px solid #ffe08a;
+  border-radius: 10px;
+  padding: 10px 22px;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.btn.ghost {
+  display: block;
+  margin: 10px auto 0;
+  background: transparent;
+  color: #fff6d8;
+  border-color: rgba(255, 214, 120, 0.4);
+}
+
+.stats {
+  text-align: left;
+  margin: 0 auto 18px;
+  max-width: 280px;
+}
+
+.stats div {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 214, 120, 0.18);
+}
+
+.stats span {
+  opacity: 0.8;
+}
+
+@media (max-width: 820px) {
+  .hud-help {
+    font-size: 11px;
+    max-width: 46vw;
+  }
+  .minimap {
+    width: 120px;
+    height: 120px;
+    bottom: 150px;
+  }
 }
