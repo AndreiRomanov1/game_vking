@@ -137,7 +137,7 @@ export function createShips(scene) {
 export function updateShips(ships, dt, time, fx) {
   for (const s of ships) {
     const wait = Math.max(0, time - s.def.delay);
-    const dur = 7.4;
+    const dur = 6.2;
     s.progress = Math.min(1, wait / dur);
     const ease = 1 - Math.pow(1 - s.progress, 1.6);
     const z = THREE.MathUtils.lerp(s.def.startZ, s.def.endZ, ease);

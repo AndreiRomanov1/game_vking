@@ -167,6 +167,7 @@ game.togglePause = () => {
 };
 
 bindInput(game);
+window.__raid = game;
 
 let saidLand = false;
 let saidDusk = false;
@@ -185,7 +186,7 @@ resize();
 let last = performance.now();
 
 function loop(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   const time = game.started && !game.paused ? (game.matchTime += dt) : game.matchTime;
 
