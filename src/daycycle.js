@@ -341,5 +341,15 @@ export function createDayCycle(scene, renderer) {
     return look;
   }
 
-  return { update, addTorchLight, sun, sky, look };
+  function setShadowQuality(level) {
+    const size = [1024, 2048, 2048, 4096][THREE.MathUtils.clamp(level, 0, 3)];
+    if (sun.shadow.mapSize.x === size) return;
+    sun.shadow.mapSize.set(size, size);
+    if (sun.shadow.map) {
+      sun.shadow.map.dispose();
+      sun.shadow.map = null;
+    }
+  }
+
+  return { update, addTorchLight, setShadowQuality, sun, sky, look };
 }

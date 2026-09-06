@@ -131,6 +131,7 @@ export function createPostFx(renderer, scene, camera, opts = {}) {
     grade.uniforms.uGrain.value = l >= 2 ? 0.028 : 0.012;
     renderer.shadowMap.enabled = true;
     resize();
+    opts.onLevel?.(l);
   }
 
   function setLevel(level, manual = false) {

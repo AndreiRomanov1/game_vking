@@ -124,6 +124,11 @@ const game = {
 
 const postfx = createPostFx(renderer, scene, camera, {
   onChange: (level) => game.hud?.setQuality(QUALITY_LABELS[level]),
+  onLevel: (level) => {
+    grass.mesh.visible = level >= 1;
+    flowers.mesh.visible = level >= 1;
+    day.setShadowQuality(level);
+  },
 });
 game.postfx = postfx;
 
